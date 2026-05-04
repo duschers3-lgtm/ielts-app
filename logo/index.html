@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雅思词汇特训 - 账号云同步版</title>
+    <link rel="manifest" href="manifest.json">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Jack雅思">
+<link rel="apple-touch-icon" href="icon-512.png">
+
+<meta name="theme-color" content="#78C2AD">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .test-card-container { perspective: 1000px; }
+        .test-card-inner {
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .test-card-inner.flipped { transform: rotateY(180deg); }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .btn-active:active { transform: scale(0.95); }
+        @keyframes slide-in { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide { animation: slide-in 0.4s ease-out; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .sync-spin { animation: spin 2s linear infinite; }
+        .speak-btn { transition: all 0.2s; cursor: pointer; }
+
+        /* SSS级专属光晕流转特效 */
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+        .animate-shine {
+            background-size: 200% auto;
+            animation: shine 3s linear infinite;
+        }
+
+        /* 状态栏渐变 */
+        .status-saved { color: #86efac; transition: color 0.3s; }
+        .status-saving { color: #fde047; transition: color 0.3s; }
+
+        /* 登录框毛玻璃 */
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+    </style>
+
+    <script type="module">
+        // ==========================================
+        // 核心配置区 - Firebase 云端集成
+        // ==========================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbsPyl6AViSotGLWYGgajFh2b6GFDcLF4",
+            authDomain: "ielts-vocab-47d25.firebaseapp.com",
+            projectId: "ielts-vocab-47d25",
+            storageBucket: "ielts-vocab-47d25.firebasestorage.app",
+            messagingSenderId: "160672981124",
+            appId: "1:160672981124:web:9a203e7d176d835be5e2d1",
+            measurementId: "G-0Y72E45JJM"
+        };
+
+        // ==========================================
+// 多 API Key 轮询配置池
+// ==========================================
+const apiKeys = [
+    "AIzaSyCdASXgsKaBwc7VnpMRl4O7p0AkKfll_08", // 你的第一个 Key
+    "AIzaSyDWRqqSztBb_NEqQCfiqzrw7e-qOT09oy0",               // 填入你的第二个 Key
+    "AIzaSyAudxPnmrR3-jV_SH0s2heQNuBrwVdpfIc",
+    "AIzaSyAZdy_aZYySITA2611WLPBAjTtRhFD-Q5c",
+    "AIzaSyB8V3jTsH-I6M2SChnBVCmsAbhgFiiSevE",
+    "AIzaSyA7DakP3mdhe8OQvDe5vihFWG-YJtA3Feo"
+    // 填入你的第三个 Key (可随时增删)
+];
+let currentKeyIndex = 0;
+
+// 获取当前正在使用的 Key
+function getCurrentApiKey() {
+    return apiKeys[currentKeyIndex];
+}
+
+// 自动切换到下一个可用 Key
+function switchToNextApiKey() {
+    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+    console.warn(`[API 系统] 当前 Key 额度耗尽或受限，已无缝切换至第 ${currentKeyIndex + 1} 个备用 Key`);
+}
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // ------------------ 基础词库 (已适配八大场景与二级分类) ------------------
+        // ------------------ 基础词库 (已补全词性 pos 字段及完整短语音标) ------------------
+        window.baseVocab = [
+            { id: 1, word: "Biodiversity", pos: "n.", cn: "生物多样性", col: "Maintain biodiversity", uk: "/ˌbaɪəʊdaɪˈvɜːsəti/", us: "/ˌbaɪoʊdaɪˈvɜːrsəti/", theme: "自然与环境", cat: "生态与动植物", icon: "🌿", tier: "SSS" },
+            { id: 2, word: "Ecosystem", pos: "n.", cn: "生态系统", col: "Upset the ecological balance", uk: "/ˈiːkəʊˌsɪstəm/", us: "/ˈiːkoʊˌsɪstəm/", theme: "自然与环境", cat: "生态与动植物", icon: "🌐", tier: "SS" },
+            { id: 3, word: "Habitat", pos: "n.", cn: "栖息地", col: "Natural habitat loss", uk: "/ˈhæbɪtæt/", us: "/ˈhæbɪtæt/", theme: "自然与环境", cat: "生态与动植物", icon: "🏞️", tier: "SS" },
+            { id: 4, word: "Flora and fauna", pos: "n. phrase", cn: "动植物", col: "Exotic flora and fauna", uk: "/ˈflɔːrə ənd ˈfɔːnə/", us: "/ˈflɔːrə ənd ˈfɔːnə/", theme: "自然与环境", cat: "生态与动植物", icon: "🌸", tier: "A" },
+            { id: 5, word: "Endangered species", pos: "n. phrase", cn: "濒危物种", col: "Species at risk", uk: "/ɪnˈdeɪndʒəd ˈspiːʃiːz/", us: "/ɪnˈdeɪndʒərd ˈspiːʃiːz/", theme: "自然与环境", cat: "生态与动植物", icon: "🦧", tier: "SS" },
+            { id: 6, word: "Natural balance", pos: "n. phrase", cn: "自然平衡", col: "Keep the natural balance", uk: "/ˈnætʃrəl ˈbæləns/", us: "/ˈnætʃrəl ˈbæləns/", theme: "自然与环境", cat: "生态与动植物", icon: "⚖️", tier: "A" },
+            { id: 7, word: "Genetic diversity", pos: "n. phrase", cn: "基因多样性", col: "Broaden genetic diversity", uk: "/dʒəˈnetɪk daɪˈvɜːsəti/", us: "/dʒəˈnetɪk dɪˈvɜːrsəti/", theme: "自然与环境", cat: "生态与动植物", icon: "🧬", tier: "S" },
+            { id: 8, word: "Food web", pos: "n. phrase", cn: "食物网", col: "Complex food web", uk: "/fuːd web/", us: "/fuːd web/", theme: "自然与环境", cat: "生态与动植物", icon: "🕸️", tier: "B" },
+            { id: 9, word: "Apex predator", pos: "n. phrase", cn: "顶级掠食者", col: "Role of apex predators", uk: "/ˈeɪpeks ˈpredətə(r)/", us: "/ˈeɪpeks ˈpredətər/", theme: "自然与环境", cat: "生态与动植物", icon: "🦅", tier: "B" },
+            { id: 10, word: "Primal environment", pos: "n. phrase", cn: "原始环境", col: "Protect the primal environment", uk: "/ˈpraɪml ɪnˈvaɪrənmənt/", us: "/ˈpraɪml ɪnˈvaɪrənmənt/", theme: "自然与环境", cat: "生态与动植物", icon: "🌲", tier: "C" },
+            { id: 11, word: "Extinction", pos: "n.", cn: "灭绝", col: "Face imminent extinction", uk: "/ɪkˈstɪŋkʃn/", us: "/ɪkˈstɪŋkʃn/", theme: "自然与环境", cat: "生态与动植物", icon: "🪦", tier: "SSS" },
+            { id: 12, word: "Poaching", pos: "n./v.", cn: "偷猎", col: "Anti-poaching patrol", uk: "/ˈpəʊtʃɪŋ/", us: "/ˈpoʊtʃɪŋ/", theme: "政府与法律", cat: "法律与犯罪", icon: "🔫", tier: "S" },
+            { id: 13, word: "Deforestation", pos: "n.", cn: "森林砍伐", col: "Large-scale deforestation", uk: "/ˌdiːˌfɒrɪˈsteɪʃn/", us: "/ˌdiːˌfɔːrɪˈsteɪʃn/", theme: "自然与环境", cat: "环保与能源", icon: "🪓", tier: "SS" },
+            { id: 14, word: "Habitat fragmentation", pos: "n. phrase", cn: "栖息地破碎化", col: "Cause fragmentation", uk: "/ˈhæbɪtæt ˌfræɡmenˈteɪʃn/", us: "/ˈhæbɪtæt ˌfræɡmenˈteɪʃn/", theme: "自然与环境", cat: "生态与动植物", icon: "🧩", tier: "A" },
+            { id: 15, word: "Invasive species", pos: "n. phrase", cn: "入侵物种", col: "Spread of invasive species", uk: "/ɪnˈveɪsɪv ˈspiːʃiːz/", us: "/ɪnˈveɪsɪv ˈspiːʃiːz/", theme: "自然与环境", cat: "生态与动植物", icon: "🦟", tier: "S" },
+            { id: 16, word: "Exploitation", pos: "n.", cn: "过度开发/剥削", col: "Commercial exploitation", uk: "/ˌeksplɔɪˈteɪʃn/", us: "/ˌeksplɔɪˈteɪʃn/", theme: "自然与环境", cat: "环保与能源", icon: "⛓️", tier: "SS" },
+            { id: 17, word: "Illegal trade", pos: "n. phrase", cn: "非法贸易", col: "Trafficking of wildlife", uk: "/ɪˈliːɡl treɪd/", us: "/ɪˈliːɡl treɪd/", theme: "政府与法律", cat: "法律与犯罪", icon: "💰", tier: "A" },
+            { id: 18, word: "Overfishing", pos: "n.", cn: "过度捕捞", col: "Deplete fish stocks", uk: "/ˌəʊvəˈfɪʃɪŋ/", us: "/ˌoʊvərˈfɪʃɪŋ/", theme: "自然与环境", cat: "环保与能源", icon: "🎣", tier: "S" },
+            { id: 19, word: "Urban sprawl", pos: "n. phrase", cn: "城市扩张", col: "Encroach on habitats", uk: "/ˈɜːbən sprɔːl/", us: "/ˈɜːrbən sprɔːl/", theme: "社会与文化", cat: "城市化问题", icon: "🏗️", tier: "S" },
+            { id: 20, word: "Climate change", pos: "n. phrase", cn: "气候变化", col: "Adapt to climate change", uk: "/ˈklaɪmət tʃeɪndʒ/", us: "/ˈklaɪmət tʃeɪndʒ/", theme: "自然与环境", cat: "气候与灾害", icon: "🔥", tier: "SSS" },
+            { id: 21, word: "Conservation", pos: "n.", cn: "保护/保存", col: "Wildlife conservation program", uk: "/ˌkɒnsəˈveɪʃn/", us: "/ˌkɑːnsərˈveɪʃn/", theme: "自然与环境", cat: "环保与能源", icon: "🌱", tier: "SSS" },
+            { id: 22, word: "Sanctuary", pos: "n.", cn: "避难所", col: "Establish a sanctuary", uk: "/ˈsæŋktʃuəri/", us: "/ˈsæŋktʃueri/", theme: "自然与环境", cat: "生态与动植物", icon: "🏕️", tier: "A" },
+            { id: 23, word: "Captive breeding", pos: "n. phrase", cn: "圈养繁殖", col: "Breeding programs", uk: "/ˈkæptɪv ˈbriːdɪŋ/", us: "/ˈkæptɪv ˈbriːdɪŋ/", theme: "自然与环境", cat: "生态与动植物", icon: "🐣", tier: "B" },
+            { id: 24, word: "Reforestation", pos: "n.", cn: "重新造林", col: "Engage in reforestation", uk: "/ˌriːˌfɒrɪˈsteɪʃn/", us: "/ˌriːˌfɔːrɪˈsteɪʃn/", theme: "自然与环境", cat: "环保与能源", icon: "🌳", tier: "S" },
+            { id: 25, word: "Sustainable", pos: "adj.", cn: "可持续的", col: "Sustainable development", uk: "/səˈsteɪnəbl/", us: "/səˈsteɪnəbl/", theme: "自然与环境", cat: "环保与能源", icon: "♻️", tier: "SSS" },
+            { id: 26, word: "Animal welfare", pos: "n. phrase", cn: "动物福利", col: "Ensure animal welfare", uk: "/ˈænɪml ˈwelfeə(r)/", us: "/ˈænɪml ˈwelfer/", theme: "社会与文化", cat: "文化与传统", icon: "🐾", tier: "SS" },
+            { id: 27, word: "Legislation", pos: "n.", cn: "立法", col: "Enact strict legislation", uk: "/ˌledʒɪsˈleɪʃn/", us: "/ˌledʒɪsˈleɪʃn/", theme: "政府与法律", cat: "政府职能", icon: "📜", tier: "SS" },
+            { id: 28, word: "Nature reserve", pos: "n. phrase", cn: "自然保护区", col: "Designate a reserve", uk: "/ˈneɪtʃə(r) rɪˈzɜːv/", us: "/ˈneɪtʃər rɪˈzɜːrv/", theme: "自然与环境", cat: "生态与动植物", icon: "🏞️", tier: "S" },
+            { id: 29, word: "Ecotourism", pos: "n.", cn: "生态旅游", col: "Revenue from ecotourism", uk: "/ˌiːkəʊˈtʊərɪzəm/", us: "/ˌiːkoʊˈtʊrɪzəm/", theme: "日常生活与休闲", cat: "旅游与交通", icon: "📸", tier: "A" },
+            { id: 30, word: "Environmental awareness", pos: "n. phrase", cn: "环保意识", col: "Raise public awareness", uk: "/ɪnˌvaɪrənˈmentl əˈweənəs/", us: "/ɪnˌvaɪrənˈmentl əˈwernəs/", theme: "自然与环境", cat: "环保与能源", icon: "📢", tier: "SS" },
+            { id: 31, word: "Vivisection", pos: "n.", cn: "活体解剖", col: "Ban vivisection", uk: "/ˌvɪvɪˈsekʃn/", us: "/ˌvɪvɪˈsekʃn/", theme: "科学与技术", cat: "科技影响", icon: "🔬", tier: "B" },
+            { id: 32, word: "Inhumane", pos: "adj.", cn: "不人道的", col: "Cruel and inhumane", uk: "/ˌɪnhjuːˈmeɪn/", us: "/ˌɪnhjuːˈmeɪn/", theme: "社会与文化", cat: "文化与传统", icon: "💔", tier: "S" },
+            { id: 33, word: "Medical breakthrough", pos: "n. phrase", cn: "医学突破", col: "Key breakthroughs", uk: "/ˈmedɪkl ˈbreɪkθruː/", us: "/ˈmedɪkl ˈbreɪkθruː/", theme: "医疗与健康", cat: "医疗与治疗", icon: "💊", tier: "S" },
+            { id: 34, word: "Sentient beings", pos: "n. phrase", cn: "感知生物", col: "Moral status of animals", uk: "/ˈsentiənt ˈbiːɪŋz/", us: "/ˈsenʃnt ˈbiːɪŋz/", theme: "自然与环境", cat: "生态与动植物", icon: "🧠", tier: "A" },
+            { id: 35, word: "Alternative methods", pos: "n. phrase", cn: "替代方案", col: "Non-animal testing", uk: "/ɔːlˈtɜːnətɪv ˈmeθədz/", us: "/ɔːlˈtɜːrnətɪv ˈmeθədz/", theme: "科学与技术", cat: "前沿科技", icon: "💻", tier: "SS" },
+            { id: 36, word: "Moral obligation", pos: "n. phrase", cn: "道德义务", col: "Sense of obligation", uk: "/ˈmɒrəl ˌɒblɪˈɡeɪʃn/", us: "/ˈmɔːrəl ˌɑːblɪˈɡeɪʃn/", theme: "社会与文化", cat: "文化与传统", icon: "🙏", tier: "S" },
+            { id: 37, word: "Subject to", pos: "v. phrase", cn: "使遭受", col: "Subject animals to pain", uk: "/səbˈdʒekt tuː/", us: "/səbˈdʒekt tuː/", theme: "科学与技术", cat: "科技影响", icon: "🧪", tier: "A" },
+            { id: 38, word: "Human safety", pos: "n. phrase", cn: "人类安全", col: "Prioritize human safety", uk: "/ˈhjuːmən ˈseɪfti/", us: "/ˈhjuːmən ˈseɪfti/", theme: "医疗与健康", cat: "生活方式", icon: "👨‍👩‍👧", tier: "A" },
+            { id: 39, word: "Activists", pos: "n.", cn: "活动家", col: "Protest from activists", uk: "/ˈæktɪvɪsts/", us: "/ˈæktɪvɪsts/", theme: "社会与文化", cat: "文化与传统", icon: "✊", tier: "A" },
+            { id: 40, word: "Cruelty-free", pos: "adj.", cn: "无残害的", col: "Cruelty-free cosmetics", uk: "/ˈkruːəlti friː/", us: "/ˈkruːəlti friː/", theme: "医疗与健康", cat: "生活方式", icon: "🐰", tier: "B" },
+            { id: 41, word: "Soar", pos: "v.", cn: "骤升；猛增", col: "soaring property prices", uk: "/sɔː(r)/", us: "/sɔːr/", theme: "工作与经济", cat: "宏观经济", icon: "📈", tier: "SS" },
+            { id: 42, word: "Spacecraft", pos: "n.", cn: "航天器；宇宙飞船", col: "manned spacecraft missions", uk: "/ˈspeɪskrɑːft/", us: "/ˈspeɪskræft/", theme: "科学与技术", cat: "前沿科技", icon: "🚀", tier: "A" },
+            { id: 43, word: "Solar", pos: "adj.", cn: "太阳的；利用太阳能的", col: "solar energy systems", uk: "/ˈsəʊlə(r)/", us: "/ˈsoʊlər/", theme: "自然与环境", cat: "环保与能源", icon: "☀️", tier: "SS" },
+            { id: 44, word: "Lunar", pos: "adj.", cn: "月亮的；月球的", col: "lunar exploration program", uk: "/ˈluːnə(r)/", us: "/ˈluːnər/", theme: "科学与技术", cat: "前沿科技", icon: "🌑", tier: "A" },
+            { id: 45, word: "Astronaut", pos: "n.", cn: "宇航员；太空人", col: "training for astronauts", uk: "/ˈæstrənɔːt/", us: "/ˈæstrənɑːt/", theme: "科学与技术", cat: "前沿科技", icon: "👨‍🚀", tier: "B" },
+            { id: 46, word: "Peril", pos: "n.", cn: "极大的危险；危难", col: "place the species in peril", uk: "/ˈperəl/", us: "/ˈperəl/", theme: "自然与环境", cat: "气候与灾害", icon: "⚠️", tier: "A" },
+            { id: 47, word: "Alliance", pos: "n.", cn: "联盟；同盟", col: "form a strategic alliance", uk: "/əˈlaɪəns/", us: "/əˈlaɪəns/", theme: "政府与法律", cat: "政府职能", icon: "🤝", tier: "A" }
+        ];
+
+        window.vocabData = [...window.baseVocab];
+        window.memoryState = {};
+        window.deletedWords = [];
+        window.currentWord = null;
+        window.dueWords = [];
+        window.currentUtterance = null;
+
+        // ==========================================
+        // 账号系统逻辑 (Firebase)
+        // ==========================================
+        window.toggleAuthMode = () => {
+            const title = document.getElementById('auth-title');
+            const btn = document.getElementById('auth-main-btn');
+            const switchText = document.getElementById('auth-switch-text');
+            if (btn.innerText === '登录') {
+                title.innerText = '创建新账号';
+                btn.innerText = '注册';
+                switchText.innerText = '已有账号？去登录';
+            } else {
+                title.innerText = '欢迎回来';
+                btn.innerText = '登录';
+                switchText.innerText = '没有账号？点击注册';
+            }
+        };
+
+        window.handleAuth = async () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            const btn = document.getElementById('auth-main-btn');
+            if (!email || !pass) return window.showToast("请输入邮箱和密码", true);
+
+            try {
+                btn.disabled = true;
+                if (btn.innerText === '登录') {
+                    await signInWithEmailAndPassword(auth, email, pass);
+                } else {
+                    await createUserWithEmailAndPassword(auth, email, pass);
+                }
+            } catch (e) {
+                window.showToast("操作失败: " + e.message, true);
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        window.handleLogout = () => signOut(auth).then(() => window.location.reload());
+
+        // 监听登录状态
+        onAuthStateChanged(auth, async (user) => {
+            const overlay = document.getElementById('auth-overlay');
+            if (user) {
+                overlay.classList.add('hidden');
+                setSyncStatus('☁️ 正在读取云端...', 'text-yellow-200');
+                await syncCloudData(user.uid);
+            } else {
+                overlay.classList.remove('hidden');
+                setSyncStatus('🔒 请登录');
+            }
+        });
+
+        // ==========================================
+        // 云端同步逻辑 (Firestore)
+        // ==========================================
+        async function syncCloudData(uid) {
+            try {
+                const docRef = doc(db, "user_data", uid);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    window.memoryState = data.memoryState || {};
+                    window.deletedWords = data.deletedWords || [];
+                    const customWords = data.customWords || [];
+                    // 合并词库
+                    window.vocabData = [...window.baseVocab, ...customWords].filter(w => !window.deletedWords.includes(w.id));
+                }
+                setSyncStatus('✅ 进度已同步', 'text-green-300');
+                refreshUI();
+            } catch (e) {
+                setSyncStatus('⚠️ 读取失败', 'text-red-400');
+            }
+        }
+
+        window.saveData = async () => {
+            if (!auth.currentUser) return;
+            setSyncStatus('⏳ 正在同步...', 'text-yellow-200');
+            const uid = auth.currentUser.uid;
+            const customWords = window.vocabData.filter(w => w.id >= 48); // 基础词库ID 1-47
+            try {
+                await setDoc(doc(db, "user_data", uid), {
+                    memoryState: window.memoryState,
+                    deletedWords: window.deletedWords,
+                    customWords: customWords,
+                    lastUpdate: Date.now()
+                }, { merge: true });
+                setSyncStatus('✅ 已云端保存', 'text-green-300');
+            } catch (e) {
+                setSyncStatus('⚠️ 保存失败', 'text-red-400');
+            }
+        };
+
+        // ------------------ API 重试机制 ------------------
+        // ------------------ 智能多 Key 轮询与 API 重试机制 ------------------
+async function fetchWithBackoff(url, options, retries = Math.max(5, apiKeys.length + 2)) {
+    const delays = [1000, 2000, 4000, 8000, 16000];
+    let currentUrl = url;
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(currentUrl, options);
+
+            if (!response.ok) {
+                // 当遇到配额耗尽 (429) 或请求受限等报错时，触发 Key 切换
+                if (response.status === 429 || response.status === 403 || response.status === 400 || response.status === 503) {
+                    switchToNextApiKey();
+                    // 动态更新 URL 中的 key 参数
+                    currentUrl = currentUrl.replace(/key=([^&]*)/, `key=${getCurrentApiKey()}`);
+                    throw new Error(`Quota exceeded or API restricted (Status: ${response.status}). Switching to next Key...`);
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            }
+            return await response.json();
+
+        } catch (e) {
+            if (i === retries - 1) throw e; // 最后一次重试依然失败则向外抛出错误
+
+            // 如果是因为切换 Key 导致的重试，仅需极短延迟即可立刻重新请求
+            const delay = e.message.includes('Switching') ? 500 : (delays[i] || 2000);
+            await new Promise(res => setTimeout(res, delay));
+        }
+    }
+}
+
+        // ---------- 艺术级 Tier 徽章生成器 ----------
+        window.getTierBadge = function(tier, isLarge = false) {
+            tier = (tier || 'B').toUpperCase();
+            let style = '';
+            if (tier === 'SSS') style = 'bg-gradient-to-br from-yellow-300 via-amber-400 to-red-600 text-stone-900 ring-2 ring-yellow-400/50 shadow-lg shadow-amber-500/40 font-black italic tracking-wider';
+            else if (tier === 'SS') style = 'bg-gradient-to-br from-rose-400 via-red-500 to-rose-700 text-white ring-1 ring-red-400/50 shadow-md shadow-red-500/30 font-black italic tracking-wide';
+            else if (tier === 'S') style = 'bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-800 text-white ring-1 ring-purple-400/50 shadow-md shadow-purple-500/30 font-black italic tracking-wide';
+            else if (tier === 'A') style = 'bg-gradient-to-br from-cyan-400 to-blue-600 text-white ring-1 ring-cyan-300/50 shadow-sm shadow-blue-500/20 font-bold';
+            else if (tier === 'B') style = 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white ring-1 ring-emerald-300/50 shadow-sm shadow-emerald-500/20 font-bold';
+            else if (tier === 'C') style = 'bg-gradient-to-br from-slate-400 to-slate-600 text-white ring-1 ring-slate-400/50 shadow-sm shadow-slate-500/20 font-bold';
+            else style = 'bg-gradient-to-br from-stone-200 to-stone-400 text-stone-700 ring-1 ring-stone-300/50 shadow-sm font-bold';
+
+            const sizeClass = isLarge ? 'text-sm px-3 py-1' : 'text-[10px] px-2 py-0.5';
+            const transformClass = (!isLarge && tier === 'SSS') ? 'transform scale-110 origin-right' : '';
+
+            return `<span class="rounded-md inline-block ${sizeClass} ${style} ${transformClass}">Tier: ${tier}</span>`;
+        }
+
+        // ---------- 帅气的卡片背景生成器 ----------
+        window.getCardTheme = function(tier) {
+            tier = (tier || 'D').toUpperCase();
+            if (tier === 'SSS') return 'bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 border-amber-400 shadow-amber-300/50';
+            if (tier === 'SS') return 'bg-gradient-to-br from-rose-100 via-red-50 to-rose-100 border-red-300 shadow-red-300/50';
+            if (tier === 'S') return 'bg-gradient-to-br from-violet-100 via-purple-50 to-indigo-100 border-purple-300 shadow-purple-300/50';
+            if (tier === 'A') return 'bg-gradient-to-br from-blue-50 via-cyan-50 to-sky-100 border-blue-200 shadow-blue-200/50';
+            if (tier === 'B') return 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-100 border-emerald-200 shadow-emerald-200/50';
+            if (tier === 'C') return 'bg-gradient-to-br from-slate-50 via-gray-100 to-slate-200 border-slate-300 shadow-slate-300/50';
+            return 'bg-gradient-to-br from-stone-50 via-gray-50 to-slate-100 border-stone-200 shadow-stone-200/50';
+        }
+
+        // ---------- 各种 UI 弹窗组件 ----------
+        window.showToast = function(msg, isError = false, duration = 3000) {
+            const t = document.createElement('div');
+            t.className = `fixed top-10 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white font-bold shadow-2xl z-[9999] animate-slide ${isError ? 'bg-red-600' : 'bg-green-600 border-2 border-white'}`;
+            t.innerText = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), duration);
+        }
+
+        window.showConfirm = function(msg, onConfirm, onCancel = null, confirmText = "确定", cancelText = "取消") {
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-6 animate-slide";
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl flex flex-col text-center">
+                    <div class="text-4xl mb-4">⚠️</div>
+                    <h3 class="text-xl font-black text-stone-800 mb-2">确认操作</h3>
+                    <p class="text-stone-500 mb-8">${msg}</p>
+                    <div class="flex gap-4">
+                        <button id="btn-cancel" class="flex-1 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-colors">${cancelText}</button>
+                        <button id="btn-confirm" class="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">${confirmText}</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('btn-cancel').onclick = () => {
+                modal.remove();
+                if (onCancel) onCancel();
+            };
+            document.getElementById('btn-confirm').onclick = () => {
+                modal.remove();
+                onConfirm();
+            };
+        }
+
+        // ---------- 动态炫彩等级弹窗 (已增加分类路径显示) ----------
+        window.showSuccessCard = function(word, cn, tier, theme, cat) {
+            const t = (tier || 'D').toUpperCase();
+            const styles = {
+                'SSS': { border: 'border-t-[12px] border-yellow-400', bg: 'bg-gradient-to-br from-stone-900 via-stone-800 to-stone-900', wordText: 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-white to-yellow-300 animate-shine drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]', cnText: 'text-amber-100', titleText: 'text-amber-500', btnClass: 'bg-gradient-to-r from-yellow-500 to-amber-600 text-stone-900 shadow-[0_0_20px_rgba(251,191,36,0.4)] hover:scale-105 hover:shadow-[0_0_30px_rgba(251,191,36,0.6)]', emoji: '👑', glow: 'shadow-[0_0_50px_rgba(251,191,36,0.4)]' },
+                'SS': { border: 'border-t-8 border-rose-500', bg: 'bg-gradient-to-br from-rose-50 via-white to-red-50', wordText: 'text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-red-600 drop-shadow-sm', cnText: 'text-rose-900', titleText: 'text-rose-400', btnClass: 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-lg shadow-rose-500/40 hover:scale-105', emoji: '🔥', glow: 'shadow-[0_0_40px_rgba(244,63,94,0.3)]' },
+                'S': { border: 'border-t-8 border-violet-500', bg: 'bg-gradient-to-br from-violet-50 via-white to-purple-50', wordText: 'text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-600 drop-shadow-sm', cnText: 'text-violet-900', titleText: 'text-violet-400', btnClass: 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/40 hover:scale-105', emoji: '🔮', glow: 'shadow-[0_0_40px_rgba(139,92,246,0.3)]' },
+                'A': { border: 'border-t-8 border-blue-400', bg: 'bg-white', wordText: 'text-blue-600', cnText: 'text-stone-700', titleText: 'text-stone-400', btnClass: 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30 active:scale-95', emoji: '💎', glow: 'shadow-2xl' },
+                'B': { border: 'border-t-8 border-emerald-500', bg: 'bg-white', wordText: 'text-emerald-600', cnText: 'text-stone-700', titleText: 'text-stone-400', btnClass: 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 active:scale-95', emoji: '🎉', glow: 'shadow-2xl' },
+                'C': { border: 'border-t-8 border-slate-400', bg: 'bg-white', wordText: 'text-slate-600', cnText: 'text-stone-700', titleText: 'text-stone-400', btnClass: 'bg-slate-500 hover:bg-slate-600 text-white shadow-lg shadow-slate-500/30 active:scale-95', emoji: '👏', glow: 'shadow-2xl' },
+                'D': { border: 'border-t-8 border-stone-300', bg: 'bg-white', wordText: 'text-stone-600', cnText: 'text-stone-700', titleText: 'text-stone-400', btnClass: 'bg-stone-500 hover:bg-stone-600 text-white shadow-lg shadow-stone-500/30 active:scale-95', emoji: '👍', glow: 'shadow-2xl' }
+            };
+            const s = styles[t] || styles['D'];
+
+            // 根据卡片底色深浅，自适应文件夹标签的样式
+            const folderBgStyle = t === 'SSS' ? 'bg-white/10 border-white/20 text-amber-200' : 'bg-black/5 border-black/10 text-stone-500';
+            const folderHtml = (theme && cat) ? `<div class="text-xs font-bold ${folderBgStyle} px-3 py-1.5 rounded-lg inline-block mx-auto mt-2 mb-4 border relative z-10 backdrop-blur-sm shadow-sm flex items-center gap-1 justify-center"><span class="text-base">📂</span> 归档至：${theme} / ${cat}</div>` : '';
+
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-6 animate-slide backdrop-blur-sm";
+            modal.innerHTML = `
+                <div class="${s.bg} rounded-3xl w-full max-w-sm p-8 flex flex-col text-center ${s.border} ${s.glow} transform transition-all scale-100 relative overflow-hidden">
+                    ${t === 'SSS' ? '<div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(251,191,36,0.1)_0%,transparent_70%)] animate-pulse pointer-events-none"></div>' : ''}
+                    <div class="text-6xl mb-4 animate-bounce relative z-10">${s.emoji}</div>
+                    <h3 class="text-sm font-bold ${s.titleText} mb-1 tracking-widest uppercase relative z-10">恭喜获得新词汇</h3>
+                    <h2 class="text-4xl font-black ${s.wordText} mb-2 relative z-10">${word}</h2>
+                    <p class="text-xl font-bold ${s.cnText} mb-2 relative z-10">${cn}</p>
+                    ${folderHtml}
+                    <div class="mb-8 mx-auto relative z-10">${window.getTierBadge(tier, true)}</div>
+                    <button id="btn-got-it" class="w-full py-4 rounded-2xl font-bold transition-all ${s.btnClass} relative z-10">知道了</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('btn-got-it').onclick = () => {
+                modal.remove();
+            };
+        }
+
+        window.showReviewCard = function(wordObj) {
+            const tier = wordObj.tier || 'B';
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-6 animate-slide backdrop-blur-sm";
+            modal.innerHTML = `
+                <div class="bg-gradient-to-br from-blue-50 via-white to-cyan-50 rounded-3xl w-full max-w-sm p-8 flex flex-col text-center border-t-8 border-blue-500 shadow-2xl transform transition-all scale-100 relative overflow-hidden">
+                    <div class="text-6xl mb-4 animate-bounce relative z-10">📚</div>
+                    <h3 class="text-sm font-bold text-blue-500 mb-1 tracking-widest uppercase relative z-10">词库已存在 · 顺便复习</h3>
+                    <h2 class="text-4xl font-black text-stone-800 mb-2 relative z-10">${wordObj.word}</h2>
+                    <p class="text-xl font-bold text-stone-600 mb-4 relative z-10">${wordObj.cn || '暂无释义'}</p>
+                    <div class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold text-xs mb-6 mx-auto border border-blue-200 shadow-sm">${wordObj.col || '暂无搭配'}</div>
+                    <div class="mb-8 mx-auto relative z-10">${window.getTierBadge(tier, true)}</div>
+                    <button id="btn-review-got-it" class="w-full py-4 rounded-2xl font-bold transition-all bg-blue-500 hover:bg-blue-600 text-white shadow-lg active:scale-95 relative z-10">知道了</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('btn-review-got-it').onclick = () => {
+                modal.remove();
+            };
+        }
+
+        function setSyncStatus(html, statusClass = "") {
+            const el = document.getElementById('cloud-status');
+            if (el) {
+                el.innerHTML = html;
+                el.className = `absolute top-4 right-6 text-[10px] font-mono bg-black/20 px-3 py-1 rounded-full italic ${statusClass || 'text-green-200'}`;
+            }
+        }
+
+        // ---------- 初始化与本地数据同步 ----------
+        async function initApp() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+            }
+            refreshUI();
+        }
+
+        // ---------- 备份功能：导出独立的 HTML ----------
+        window.downloadUpdatedHTML = function() {
+            let htmlContent = document.documentElement.outerHTML;
+
+            // 1. 固化所有词库（包含新增词汇）
+            let vocabStr = "window.baseVocab = [\n";
+            window.vocabData.forEach((w, index) => {
+                vocabStr += `            { id: ${w.id}, word: "${w.word}", cn: "${w.cn || ''}", col: "${w.col || ''}", uk: "${w.uk || ''}", us: "${w.us || ''}", theme: "${w.theme}", cat: "${w.cat}", icon: "${w.icon || ''}", tier: "${w.tier || 'A'}" }${index < window.vocabData.length - 1 ? ',' : ''}\n`;
+            });
+            vocabStr += "        ];";
+            htmlContent = htmlContent.replace(/window\.baseVocab\s*=\s*\[[\s\S]*?\];/, vocabStr);
+
+            // 2. 固化记忆曲线进度
+            let memoryStr = `window.memoryState = ${JSON.stringify(window.memoryState)};`;
+            htmlContent = htmlContent.replace(/window\.memoryState\s*=\s*\{.*?\};/, memoryStr);
+
+            // 3. 固化被删除的词汇
+            let deletedStr = `window.deletedWords = ${JSON.stringify(window.deletedWords)};`;
+            htmlContent = htmlContent.replace(/window\.deletedWords\s*=\s*\[.*?\];/, deletedStr);
+
+            const blob = new Blob(['<!DOCTYPE html>\n' + htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'IELTS-Vocab-Backup.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            window.showToast("独立备份版已生成下载！");
+        }
+
+        function refreshUI() {
+            window.updateDueWords();
+            window.updateStats();
+            window.renderTestCard();
+            if(!document.getElementById('library-view').classList.contains('hidden')) window.renderLibrary();
+        }
+
+        // ---------- 艾宾浩斯复习算法 ----------
+        window.updateDueWords = function() {
+            const now = Date.now();
+            window.dueWords = window.vocabData.filter(w => {
+                const state = window.memoryState[w.id];
+                return !state || state.next <= now;
+            });
+        }
+
+        window.updateStats = function() {
+            const counts = { 0: 0, 1: 0, 2: 0, 3: 0 };
+            window.vocabData.forEach(w => {
+                const state = window.memoryState[w.id];
+                counts[state ? state.lvl : 0]++;
+            });
+            [0,1,2,3].forEach(l => {
+                const el = document.getElementById(`stat-l${l}`);
+                if(el) el.innerText = counts[l];
+            });
+            const dueEl = document.getElementById('stat-due');
+            if(dueEl) dueEl.innerText = window.dueWords.length;
+        }
+
+        // 完整版：测试卡片 UI（包含右下角编辑按钮和词性显示，采用 flex-wrap 防止音标溢出）
+        window.renderTestCard = function() {
+            const container = document.getElementById('test-zone');
+            if (window.dueWords.length === 0) {
+                container.innerHTML = `<div class="text-center p-10 bg-green-50 rounded-3xl border-2 border-green-200 animate-slide"><div class="text-5xl mb-4">🎉</div><h3 class="text-2xl font-black text-green-800">今日任务已达标</h3><p class="text-green-600 mt-2">进度已保存。艾宾浩斯曲线正在后台加固你的记忆。</p></div>`;
+                return;
+            }
+            if (!window.currentWord || !window.dueWords.includes(window.currentWord)) {
+                window.currentWord = window.dueWords[Math.floor(Math.random() * window.dueWords.length)];
+            }
+            const state = window.memoryState[window.currentWord.id] || { lvl: 0 };
+            const lvl = state.lvl;
+
+            const themeStyle = window.getCardTheme(window.currentWord.tier);
+
+            const icon = window.currentWord.icon || "📌";
+            const cn = window.currentWord.cn || "暂无中文释义";
+            const col = window.currentWord.col || "暂无相关搭配";
+            const uk = window.currentWord.uk || "";
+            const us = window.currentWord.us || "";
+            // 如果有词性则生成小标签，没有则为空
+            const pos = window.currentWord.pos ? `<span class="inline-block bg-green-800 text-green-100 text-xs px-2 py-0.5 rounded-md ml-2 align-middle font-mono">${window.currentWord.pos}</span>` : "";
+
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-4 px-2">
+                    <span class="text-xs font-bold text-stone-400 bg-stone-100 px-3 py-1 rounded-full">待背: ${window.dueWords.length} 词</span>
+                    <div class="flex gap-1">
+                        <div class="w-2 h-2 rounded-full ${lvl >= 1 ? 'bg-green-500' : 'bg-stone-200'}"></div>
+                        <div class="w-2 h-2 rounded-full ${lvl >= 2 ? 'bg-green-500' : 'bg-stone-200'}"></div>
+                        <div class="w-2 h-2 rounded-full ${lvl >= 3 ? 'bg-green-500' : 'bg-stone-200'}"></div>
+                    </div>
+                </div>
+                <div class="test-card-container h-72 relative mb-8">
+                    <div class="test-card-inner w-full h-full relative cursor-pointer" onclick="this.classList.toggle('flipped')">
+                        <div class="backface-hidden absolute inset-0 ${themeStyle} border-4 rounded-[2rem] flex flex-col items-center justify-center shadow-xl p-6 transition-all hover:shadow-2xl">
+                            <div class="absolute top-6 left-6 text-4xl opacity-40 mix-blend-multiply">${icon}</div>
+                            <div class="absolute top-6 right-6 z-10">${window.getTierBadge(window.currentWord.tier, true)}</div>
+
+                            <button onclick="window.editWord(${window.currentWord.id}, event)" class="absolute bottom-6 right-6 text-stone-400 hover:text-purple-600 z-20 text-2xl transition-colors" title="编辑单词">✏️</button>
+
+                            <h2 class="text-4xl font-black text-stone-800 mb-4 mt-6 text-center">${window.currentWord.word}</h2>
+                            <div class="flex flex-wrap justify-center gap-2 w-full px-2 mt-2" onclick="event.stopPropagation()">
+                                <button onclick="window.speak('${window.currentWord.word}', 'en-GB')" class="speak-btn px-4 py-2 border border-white/60 rounded-xl text-xs font-bold text-stone-700 bg-white/60 backdrop-blur-sm transition-all hover:bg-white/90">🇬🇧 UK ${uk}</button>
+                                <button onclick="window.speak('${window.currentWord.word}', 'en-US')" class="speak-btn px-4 py-2 border border-white/60 rounded-xl text-xs font-bold text-stone-700 bg-white/60 backdrop-blur-sm transition-all hover:bg-white/90">🇺🇸 US ${us}</button>
+                            </div>
+                        </div>
+                        <div class="backface-hidden rotate-y-180 absolute inset-0 bg-stone-800 text-white rounded-[2rem] flex flex-col items-center justify-center p-6 text-center shadow-2xl border-2 border-stone-600">
+                            <h3 class="text-3xl font-bold mb-3 text-green-400 flex items-center justify-center">${cn} ${pos}</h3>
+                            <div class="w-10 h-1 bg-green-500/30 mb-4"></div>
+                            <p class="text-sm italic text-stone-300 leading-relaxed">${col}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="window.handleResponse(false)" class="flex-1 py-4 bg-red-50 text-red-600 font-bold rounded-2xl border-b-4 border-red-200 btn-active transition-all">😞 忘了</button>
+                    <button onclick="window.handleResponse(true)" class="flex-1 py-4 bg-green-600 text-white font-bold rounded-2xl border-b-4 border-green-800 btn-active transition-all">✅ 认识</button>
+                </div>
+            `;
+        }
+
+        window.handleResponse = async function(known) {
+            const id = window.currentWord.id;
+            const state = window.memoryState[id] || { lvl: 0 };
+            const nextLvl = known ? Math.min(3, state.lvl + 1) : 0;
+            const intervals = [0, 1, 3, 7];
+            window.memoryState[id] = { lvl: nextLvl, next: Date.now() + 24 * 60 * 60 * 1000 * intervals[nextLvl] };
+            window.currentWord = null;
+            await window.saveData();
+            refreshUI();
+        }
+
+        window.deleteWord = function(id, event) {
+            event.stopPropagation();
+            const wordObj = window.vocabData.find(w => w.id === id);
+            if (!wordObj) return;
+
+            window.showConfirm(`确定要删除单词 "${wordObj.word}" 吗？删除后它将从您的云端库中彻底消失。`, async () => {
+                window.deletedWords.push(id);
+                window.vocabData = window.vocabData.filter(w => w.id !== id);
+                delete window.memoryState[id];
+
+                if (window.currentWord && window.currentWord.id === id) window.currentWord = null;
+                await window.saveData();
+                window.showToast(`已删除单词: ${wordObj.word}`);
+                refreshUI();
+            });
+        }
+        // ================= AI 解析后的确认与修改弹窗 =================
+        window.confirmAIWord = function(word, aiRes) {
+            // 提取所有已有分类，用于下拉菜单
+            const themes = [...new Set(window.vocabData.map(w => w.theme))].filter(Boolean);
+            const currentThemeCats = [...new Set(window.vocabData
+                .filter(w => w.theme === aiRes.theme)
+                .map(w => w.cat))].filter(Boolean);
+
+            // 判断 AI 给出的分类是不是全新的
+            const isNewTheme = !themes.includes(aiRes.theme);
+            const isNewCat = !currentThemeCats.includes(aiRes.cat);
+
+            const themeOptions = themes.map(t => `<option value="${t}" ${t === aiRes.theme ? 'selected' : ''}>${t}</option>`).join('') + `<option value="NEW" ${isNewTheme ? 'selected' : ''}>✨ ➕ 自定义新主题...</option>`;
+            const catOptions = currentThemeCats.map(c => `<option value="${c}" ${c === aiRes.cat ? 'selected' : ''}>${c}</option>`).join('') + `<option value="NEW" ${isNewCat ? 'selected' : ''}>✨ ➕ 自定义新分类...</option>`;
+
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-6 animate-slide backdrop-blur-sm";
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl flex flex-col" onclick="event.stopPropagation()">
+                    <h3 class="text-xl font-black text-green-700 mb-2 flex items-center gap-2"><span>✨</span> AI 解析完成 · 请核对</h3>
+                    <p class="text-xs text-stone-500 mb-6 border-b border-stone-100 pb-4">彻底入库前，您可以进行最后的自定义微调</p>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">英文单词</label>
+                            <input id="confirm-word" value="${word}" class="w-full mt-1 px-4 py-3 bg-green-50 rounded-xl border border-green-200 outline-none focus:ring-2 ring-green-500 font-black text-green-900 transition-all">
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">主文件夹 (Theme)</label>
+                                <select id="select-theme" onchange="window.toggleNewInput('theme')" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 transition-all text-sm font-bold text-blue-700 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke-width%3D%222.5%22%20stroke%3D%22%239CA3AF%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22M19%209l-7%207-7-7%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:1.1rem_1.1rem] pr-10">
+                                    ${themeOptions}
+                                </select>
+                                <div id="new-theme-container" class="${isNewTheme ? '' : 'hidden'} mt-2">
+                                    <input id="edit-theme" value="${isNewTheme ? (aiRes.theme || '') : ''}" placeholder="输入新主题" class="w-full px-4 py-2 bg-blue-50 rounded-lg border-2 border-blue-200 outline-none text-sm font-bold text-blue-800">
+                                </div>
+                            </div>
+
+                            <div class="flex-1">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">子文件夹 (Category)</label>
+                                <select id="select-cat" onchange="window.toggleNewInput('cat')" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 transition-all text-sm font-bold text-purple-700 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke-width%3D%222.5%22%20stroke%3D%22%239CA3AF%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22M19%209l-7%207-7-7%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:1.1rem_1.1rem] pr-10">
+                                    ${catOptions}
+                                </select>
+                                <div id="new-cat-container" class="${isNewCat ? '' : 'hidden'} mt-2">
+                                    <input id="edit-cat" value="${isNewCat ? (aiRes.cat || '') : ''}" placeholder="输入新分类" class="w-full px-4 py-2 bg-purple-50 rounded-lg border-2 border-purple-200 outline-none text-sm font-bold text-purple-800">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="w-1/3">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">词性</label>
+                                <input id="confirm-pos" value="${aiRes.pos || ''}" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-green-500 transition-all text-sm font-bold text-stone-600">
+                            </div>
+                            <div class="w-2/3">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">中文释义</label>
+                                <input id="confirm-cn" value="${aiRes.cn || ''}" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-green-500 transition-all text-sm font-bold text-stone-700">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 mt-8">
+                        <button id="btn-confirm-cancel" class="flex-1 py-4 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-colors">丢弃</button>
+                        <button id="btn-confirm-save" class="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-500/30 hover:bg-green-700 transition-all active:scale-95">确认入库</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('btn-confirm-cancel').onclick = () => {
+                modal.remove();
+                document.getElementById('new-word-input').value = '';
+                window.showToast("已取消录入", false, 1500);
+            };
+
+            document.getElementById('btn-confirm-save').onclick = async () => {
+                const btn = document.getElementById('btn-confirm-save');
+                btn.innerHTML = `<span class="animate-spin inline-block mr-2">🌀</span> 入库中...`;
+                btn.disabled = true;
+
+                const selTheme = document.getElementById('select-theme').value;
+                const finalTheme = selTheme === 'NEW' ? document.getElementById('edit-theme').value.trim() : selTheme;
+
+                const selCat = document.getElementById('select-cat').value;
+                const finalCat = selCat === 'NEW' ? document.getElementById('edit-cat').value.trim() : selCat;
+
+                const finalWord = document.getElementById('confirm-word').value.trim();
+
+                // 组装最终确认的单词对象
+                const newWordObj = {
+                    id: Date.now(),
+                    word: finalWord,
+                    cn: document.getElementById('confirm-cn').value.trim(),
+                    pos: document.getElementById('confirm-pos').value.trim(),
+                    col: aiRes.col, // 保留 AI 生成的搭配
+                    uk: aiRes.uk,   // 保留 AI 生成的音标
+                    us: aiRes.us,
+                    icon: aiRes.icon,
+                    tier: aiRes.tier,
+                    theme: finalTheme || '未分类主题',
+                    cat: finalCat || '未分类子集'
+                };
+
+                window.vocabData.push(newWordObj);
+                await window.saveData();
+                document.getElementById('new-word-input').value = '';
+                modal.remove();
+
+                // 彻底入库后，展示帅气的 SSS 成功卡片
+                window.showSuccessCard(newWordObj.word, newWordObj.cn, newWordObj.tier, newWordObj.theme, newWordObj.cat);
+                window.renderLibrary();
+            };
+        }
+        // ================= 下拉菜单与新建输入框联动 =================
+        window.toggleNewInput = function(type) {
+            const selectEl = document.getElementById(`select-${type}`);
+            const inputEl = document.getElementById(`edit-${type}`);
+            if (selectEl.value === 'NEW') {
+                inputEl.classList.remove('hidden');
+                inputEl.focus();
+            } else {
+                inputEl.classList.add('hidden');
+                inputEl.value = selectEl.value; // 同步当前选中的值
+            }
+        }
+        // ================= 级联菜单联动逻辑 =================
+        window.toggleNewInput = function(type) {
+            const selectEl = document.getElementById(`select-${type}`);
+            const inputContainer = document.getElementById(`new-${type}-container`);
+            const inputEl = document.getElementById(`edit-${type}`);
+
+            if (selectEl.value === 'NEW') {
+                inputContainer.classList.remove('hidden');
+                inputEl.focus();
+            } else {
+                inputContainer.classList.add('hidden');
+                inputEl.value = selectEl.value;
+            }
+
+            // 如果改变的是主文件夹，需要联动刷新子文件夹的选项
+            if (type === 'theme') {
+                window.updateCategoryDropdown();
+            }
+        }
+
+        window.updateCategoryDropdown = function() {
+            const themeSelect = document.getElementById('select-theme');
+            const catSelect = document.getElementById('select-cat');
+            const selectedTheme = themeSelect.value;
+
+            // 获取当前选中的主文件夹下已有的子文件夹
+            let availableCats = [];
+            if (selectedTheme !== 'NEW') {
+                availableCats = [...new Set(window.vocabData
+                    .filter(w => w.theme === selectedTheme)
+                    .map(w => w.cat))].filter(Boolean);
+            }
+
+            // 重新生成子文件夹下拉内容
+            let optionsHtml = availableCats.map(c => `<option value="${c}">${c}</option>`).join('');
+            optionsHtml += `<option value="NEW">✨ ➕ 自定义新分类...</option>`;
+
+            catSelect.innerHTML = optionsHtml;
+            // 默认触发一次显隐切换逻辑
+            window.toggleNewInput('cat');
+        }
+window.editWord = function(id, event) {
+            if (event) event.stopPropagation();
+            const wordObj = window.vocabData.find(w => w.id === id);
+            if (!wordObj) return;
+
+            // 1. 提取所有主文件夹
+            const themes = [...new Set(window.vocabData.map(w => w.theme))].filter(Boolean);
+
+            // 2. 提取当前单词所属主文件夹下的子文件夹
+            const currentThemeCats = [...new Set(window.vocabData
+                .filter(w => w.theme === wordObj.theme)
+                .map(w => w.cat))].filter(Boolean);
+
+            const themeOptions = themes.map(t => `<option value="${t}" ${t === wordObj.theme ? 'selected' : ''}>${t}</option>`).join('') + `<option value="NEW">✨ ➕ 自定义新主题...</option>`;
+            const catOptions = currentThemeCats.map(c => `<option value="${c}" ${c === wordObj.cat ? 'selected' : ''}>${c}</option>`).join('') + `<option value="NEW">✨ ➕ 自定义新分类...</option>`;
+
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-6 animate-slide backdrop-blur-sm";
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl flex flex-col" onclick="event.stopPropagation()">
+                    <h3 class="text-xl font-black text-purple-900 mb-6 flex items-center gap-2"><span>✏️</span> 编辑卡片归属</h3>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">英文单词</label>
+                            <input id="edit-word" value="${wordObj.word}" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 font-black text-stone-800 transition-all">
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">主文件夹 (Theme)</label>
+                                <select id="select-theme" onchange="window.toggleNewInput('theme')" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 transition-all text-sm font-bold text-blue-700 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke-width%3D%222.5%22%20stroke%3D%22%239CA3AF%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22M19%209l-7%207-7-7%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:1.1rem_1.1rem] pr-10">
+                                    ${themeOptions}
+                                </select>
+                                <div id="new-theme-container" class="hidden mt-2">
+                                    <input id="edit-theme" value="${wordObj.theme || ''}" placeholder="输入新主题" class="w-full px-4 py-2 bg-blue-50 rounded-lg border-2 border-blue-200 outline-none text-sm font-bold text-blue-800">
+                                </div>
+                            </div>
+
+                            <div class="flex-1">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">子文件夹 (Category)</label>
+                                <select id="select-cat" onchange="window.toggleNewInput('cat')" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 transition-all text-sm font-bold text-purple-700 cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke-width%3D%222.5%22%20stroke%3D%22%239CA3AF%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22M19%209l-7%207-7-7%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:1.1rem_1.1rem] pr-10">
+                                    ${catOptions}
+                                </select>
+                                <div id="new-cat-container" class="hidden mt-2">
+                                    <input id="edit-cat" value="${wordObj.cat || ''}" placeholder="输入新分类" class="w-full px-4 py-2 bg-purple-50 rounded-lg border-2 border-purple-200 outline-none text-sm font-bold text-purple-800">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="w-1/3">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">词性</label>
+                                <input id="edit-pos" value="${wordObj.pos || ''}" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 transition-all text-sm font-bold text-stone-600">
+                            </div>
+                            <div class="w-2/3">
+                                <label class="text-xs font-bold text-stone-400 uppercase tracking-wider">中文释义</label>
+                                <input id="edit-cn" value="${wordObj.cn || ''}" class="w-full mt-1 px-4 py-3 bg-stone-50 rounded-xl border border-stone-200 outline-none focus:ring-2 ring-purple-500 transition-all text-sm font-bold text-stone-700">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 mt-8">
+                        <button id="btn-edit-cancel" class="flex-1 py-4 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-colors">取消</button>
+                        <button id="btn-edit-save" class="flex-1 py-4 bg-purple-600 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30 hover:bg-purple-700 transition-all active:scale-95">保存修改</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('btn-edit-cancel').onclick = () => modal.remove();
+
+            document.getElementById('btn-edit-save').onclick = async () => {
+                const btn = document.getElementById('btn-edit-save');
+                btn.innerHTML = `<span class="animate-spin inline-block mr-2">🌀</span> 保存中...`;
+                btn.disabled = true;
+
+                const selTheme = document.getElementById('select-theme').value;
+                const finalTheme = selTheme === 'NEW' ? document.getElementById('edit-theme').value.trim() : selTheme;
+
+                const selCat = document.getElementById('select-cat').value;
+                const finalCat = selCat === 'NEW' ? document.getElementById('edit-cat').value.trim() : selCat;
+
+                wordObj.word = document.getElementById('edit-word').value.trim();
+                wordObj.theme = finalTheme || '未分类主题';
+                wordObj.cat = finalCat || '未分类子集';
+                wordObj.pos = document.getElementById('edit-pos').value.trim();
+                wordObj.cn = document.getElementById('edit-cn').value.trim();
+
+                await window.saveData();
+                modal.remove();
+                window.showToast("修改已成功保存！");
+                window.renderLibrary();
+            };
+        }
+        // ==========================================
+        // 范文词汇点击交互与一键入库弹窗
+        // ==========================================
+        window.openAITranslateModal = function(el) {
+            const word = el.getAttribute('data-word');
+            const cn = el.getAttribute('data-cn');
+
+            // 1. 检查是否已经在词库中
+            const exactMatch = window.vocabData.find(w => w.word.toLowerCase() === word.toLowerCase());
+            if (exactMatch) {
+                 window.showToast("💡 该单词已在您的云端词库中！", false, 2000);
+                 window.showReviewCard(exactMatch);
+                 return;
+            }
+
+            // 2. 渲染交互弹窗
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-6 animate-slide backdrop-blur-sm";
+            modal.innerHTML = `
+                <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl flex flex-col text-center">
+                    <div class="text-5xl mb-4">💡</div>
+                    <h3 class="text-sm font-bold text-purple-500 mb-1 tracking-widest uppercase">发现高分词汇</h3>
+                    <h2 class="text-4xl font-black text-stone-800 mb-2">${word}</h2>
+                    <p class="text-xl font-bold text-green-600 mb-8">${cn}</p>
+
+                    <div class="flex gap-4">
+                        <button id="btn-close-word" class="flex-1 py-3 bg-stone-100 text-stone-600 rounded-xl font-bold hover:bg-stone-200 transition-colors">关闭</button>
+                        <button id="btn-add-word" class="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30 hover:bg-purple-700 transition-all active:scale-95">✨ 一键入库</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('btn-close-word').onclick = () => modal.remove();
+
+            // 3. 点击入库时，直接调用现成的 AI 解析流程
+            document.getElementById('btn-add-word').onclick = () => {
+                modal.remove();
+                // 借用底部的输入框，并触发完整的 AI 词汇解析（包含抓取音标、词性、自动分类等）
+                const input = document.getElementById('new-word-input');
+                input.value = word;
+                window.autoFillAndAddWord();
+            };
+        }
+       // ---------- AI 智能特训与解析模块 ----------
+        // ---------- AI 智能特训与解析模块 ----------
+        window.triggerAI = async function(type) {
+            const panel = document.getElementById('ai-panel');
+            const loader = document.getElementById('ai-loader');
+            const content = document.getElementById('ai-content');
+
+            if (typeof apiKeys === 'undefined' || apiKeys.length === 0) {
+                window.showToast("API Key 未填入，无法使用 AI。", true, 5000);
+                return;
+            }
+
+            panel.classList.remove('hidden'); loader.classList.remove('hidden');
+            let pool = window.dueWords.length > 5 ? window.dueWords : window.vocabData;
+
+            if (!pool || pool.length === 0) {
+                 content.innerHTML = `<p class="text-amber-600 font-bold text-sm">⚠️ 词库当前为空，请先添加一些单词再进行特训。</p>`;
+                 loader.classList.add('hidden');
+                 return;
+            }
+
+            const words = pool.sort(() => 0.5 - Math.random()).slice(0, 5).map(v => v.word);
+            let prompt = "";
+
+            // 【重点修改区域】：升级了 essay 的指令，强迫 AI 植入点击事件并返回中文释义
+            if(type === 'essay') {
+                prompt = `You are a professional IELTS tutor. Write a Band 8.5 academic paragraph about common IELTS topics using EXACTLY these words: ${words.join(', ')}.
+Format as clean HTML with a title in <h4 class="text-purple-800 font-black mb-2 underline">.
+Bold the exact target words.
+
+CRITICAL NEW RULE: Select 4 to 6 OTHER advanced, high-scoring IELTS words (C1/C2 level) that you organically used in the paragraph. Wrap EACH of these extra advanced words in this EXACT HTML tag:
+<span class="cursor-pointer font-bold text-purple-600 border-b-2 border-purple-300 border-dashed hover:bg-purple-100 hover:text-purple-800 transition-colors px-1 rounded" data-word="THE_WORD" data-cn="THE_CHINESE_TRANSLATION" onclick="window.openAITranslateModal(this)">THE_WORD</span>.
+Do not use markdown blocks.`;
+            }
+            else if (type === 'speaking') { prompt = `Act as an IELTS Examiner. Ask ONE Part 3 depth question. Then provide a Band 9.0 model answer using EXACTLY these words: ${words.join(', ')}. Format with HTML <h4 class="font-bold text-purple-900 mb-2"> for question and <p class="bg-white p-4 rounded-xl border border-purple-100"> for answer. Bold the target words.`; }
+            else if (type === 'quiz') { prompt = `Create a 3-question fill-in-the-blank vocabulary quiz for these words: ${words.join(', ')}. Format as HTML <ol class="list-decimal pl-6 space-y-4 font-bold text-stone-700">. Put the answer key at the very bottom inside <div class="mt-8 p-4 bg-green-50 rounded-xl text-xs text-green-800 border border-green-100 italic">.`; }
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getCurrentApiKey()}`;
+                const data = await fetchWithBackoff(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+                content.innerHTML = data.candidates[0].content.parts[0].text.replace(/```html\n?|```/g, '');
+            } catch (e) {
+                console.error("AI Generation Error:", e);
+                content.innerHTML = `<p class="text-red-500 font-bold text-sm">⚠️ AI生成失败，请检查网络或API额度。</p>`;
+            }
+            finally { loader.classList.add('hidden'); }
+        }
+       // ==========================================
+// ==========================================
+        // 核心升级：严格剑雅标准的 AI 解析逻辑
+        // ==========================================
+        window.autoFillAndAddWord = async function() {
+            const input = document.getElementById('new-word-input');
+            const word = input.value.trim();
+            if (!word) return;
+
+            const exactMatch = window.vocabData.find(w => w.word.toLowerCase() === word.toLowerCase());
+            if (exactMatch) {
+                window.showToast("该单词已在词库中！", false, 2000);
+                window.showReviewCard(exactMatch);
+                input.value = '';
+                return;
+            }
+
+            const btn = document.getElementById('ai-parse-btn');
+            btn.innerHTML = `<span class="animate-spin inline-block mr-2">🌀</span> 严格校对中...`;
+            btn.disabled = true;
+
+            // 动态结构提取
+            const currentStruct = {};
+            window.vocabData.forEach(w => {
+                const t = w.theme || '默认主题';
+                const c = w.cat || '默认分类';
+                if (!currentStruct[t]) currentStruct[t] = new Set();
+                currentStruct[t].add(c);
+            });
+            let structStr = "";
+            for (let t in currentStruct) {
+                structStr += `- ${t}: [${Array.from(currentStruct[t]).join(', ')}]\n`;
+            }
+
+            // 【核心强化 Prompt】：引入剑桥词典与 CEFR 评级标准
+            const prompt = `You are a professional IELTS lexicographer specializing in Cambridge English Corpus.
+Analyze the word/phrase "${word}" based STRICTLY on the following hierarchy:
+
+1. **Tier SSS (IELTS 8.0+ / C2)**: Crucial for Band 8+ Writing/Speaking. Rare, sophisticated academic terms (e.g., "exacerbate", "sustainability").
+2. **Tier SS (IELTS 7.0-7.5 / C1)**: Advanced academic vocabulary common in Reading/Listening and high-level Writing (e.g., "prohibit", "substantial").
+3. **Tier S (IELTS 6.0-6.5 / B2)**: Essential core IELTS vocabulary, must-know for any candidate (e.g., "environment", "benefit").
+4. **Tier A/B/C**: General English (B1 and below). High frequency in daily life but low academic weight.
+
+VALIDATION RULES:
+- If misspelled: set "is_valid": false, provide "suggested_word".
+- Base form: Always provide the dictionary headword in "base_form".
+- Categorization: Priority to these existing folders:
+${structStr}
+
+Return JSON ONLY:
+{
+    "is_valid": boolean,
+    "suggested_word": "string",
+    "is_inflection": boolean,
+    "base_form": "string",
+    "cn": "准确中文义",
+    "pos": "词性",
+    "col": "剑雅真题风格的搭配",
+    "uk": "音标",
+    "us": "音标",
+    "icon": "Emoji",
+    "tier": "SSS/SS/S/A/B/C/D",
+    "theme": "Match existing or new",
+    "cat": "Match existing or new"
+}`;
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getCurrentApiKey()}`;
+                const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
+                const data = await fetchWithBackoff(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const res = JSON.parse(data.candidates[0].content.parts[0].text);
+
+                const saveWordToDB = async (finalWord, finalRes) => {
+                    window.confirmAIWord(finalWord, finalRes);
+                };
+
+                if (!res.is_valid && res.suggested_word) {
+                    window.showConfirm(`拼写建议：<strong>"${res.suggested_word}"</strong>？`,
+                        () => saveWordToDB(res.suggested_word, res),
+                        () => { input.value = ''; }, "录入建议词", "重输");
+                } else if (!res.is_valid) {
+                    window.showToast("无法识别该词", true);
+                } else if (res.is_inflection && res.base_form.toLowerCase() !== word.toLowerCase()) {
+                    window.showConfirm(`检测到变形词，建议添加原形 <strong>"${res.base_form}"</strong>`,
+                        () => saveWordToDB(res.base_form, res),
+                        () => saveWordToDB(word, res), "添原形", "执意添原词");
+                } else {
+                    await saveWordToDB(word, res);
+                }
+            } catch (e) {
+                window.showToast("解析失败", true);
+            } finally {
+                btn.innerHTML = `🤖 AI 解析`;
+                btn.disabled = false;
+            }
+        }
+        window.toggleSection = (id) => document.getElementById(id).classList.toggle('hidden');
+
+       // ================= 替换 1：升级后的实时搜索与动态折叠 =================
+        window.filterLibrary = function(query) {
+            query = query.toLowerCase().trim();
+            const themes = document.querySelectorAll('.theme-section');
+
+            themes.forEach(theme => {
+                let themeHasVisibleCards = false;
+                const categories = theme.querySelectorAll('.border-l-4'); // 获取二级分类容器
+
+                categories.forEach(cat => {
+                    let catHasVisibleCards = false;
+                    const cards = cat.querySelectorAll('.test-card-container');
+
+                    cards.forEach(card => {
+                        const word = card.getAttribute('data-word') || '';
+                        const cn = card.getAttribute('data-cn') || '';
+                        // 判断是否匹配（包含英文或中文）
+                        const isMatch = !query || word.includes(query) || cn.includes(query);
+                        card.classList.toggle('hidden', !isMatch);
+
+                        if (isMatch) {
+                            catHasVisibleCards = true;
+                            themeHasVisibleCards = true;
+                        }
+                    });
+
+                    // 如果该二级分类下没有匹配的单词，则隐藏整个分类标题
+                    cat.classList.toggle('hidden', !catHasVisibleCards);
+                });
+
+                // 如果该一级主题下没有匹配的单词，则隐藏整个主题
+                theme.classList.toggle('hidden', !themeHasVisibleCards);
+
+                // 交互优化：如果有搜索词且该主题有匹配项，自动展开该主题；如果清空了搜索词，则恢复折叠状态
+                const content = theme.querySelector('.theme-content');
+                if (query && themeHasVisibleCards) {
+                    content.classList.remove('hidden');
+                } else if (!query) {
+                    content.classList.add('hidden');
+                }
+            });
+        }
+// ================= 拖拽分类功能 =================
+        window.handleDragStart = function(event, id) {
+            event.dataTransfer.setData('text/plain', id);
+            // 拖动时卡片半透明
+            setTimeout(() => event.target.classList.add('opacity-50'), 0);
+        }
+
+        window.handleDragEnd = function(event) {
+            event.target.classList.remove('opacity-50');
+        }
+
+        window.handleDragOver = function(event) {
+            event.preventDefault(); // 必须阻止默认行为才能允许放置
+            // 鼠标悬浮在目标文件夹上时给出视觉反馈 (变成虚线框和浅紫色背景)
+            event.currentTarget.classList.add('bg-purple-100/30', 'border-purple-300', 'border-dashed');
+        }
+
+        window.handleDragLeave = function(event) {
+            // 移出时移除视觉反馈
+            event.currentTarget.classList.remove('bg-purple-100/30', 'border-purple-300', 'border-dashed');
+        }
+
+        window.handleDrop = async function(event, targetTheme, targetCat) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('bg-purple-100/30', 'border-purple-300', 'border-dashed');
+
+            const id = parseInt(event.dataTransfer.getData('text/plain'));
+            const wordObj = window.vocabData.find(w => w.id === id);
+
+            // 如果单词存在且目标文件夹发生变化
+            if (wordObj && (wordObj.theme !== targetTheme || wordObj.cat !== targetCat)) {
+                wordObj.theme = targetTheme;
+                wordObj.cat = targetCat;
+
+                window.showToast(`移动中...`);
+                await window.saveData(); // 保存到云端
+                window.renderLibrary();  // 重新渲染，原有的 sort 逻辑会自动将其在新的子文件夹排序
+                window.showToast(`✅ 已移动到: ${targetCat}`);
+            }
+        }
+        // ================= 按加入时间筛选及平铺显示 =================
+        window.filterByTime = function(range) {
+            const now = Date.now();
+            let targetWords = [];
+
+            // 1. 根据 ID 计算时间差（新词的 ID 是毫秒级时间戳）
+            window.vocabData.forEach(w => {
+                // 判断：只有新加的词 ID 会很大（过滤掉老旧的基础词库）
+                if (w.id > 1000000000000) {
+                    const hoursOld = (now - w.id) / (1000 * 60 * 60);
+
+                    // 递进式的逻辑：超过24h移入7天，超过7天移入30天，超过30天移出筛选
+                    if (range === '24h' && hoursOld <= 24) targetWords.push(w);
+                    else if (range === '7d' && hoursOld > 24 && hoursOld <= 24 * 7) targetWords.push(w);
+                    else if (range === '30d' && hoursOld > 24 * 7 && hoursOld <= 24 * 30) targetWords.push(w);
+                }
+            });
+
+            // 2. 按时间倒序排列（刚加进来的放最前面）
+            targetWords.sort((a, b) => b.id - a.id);
+
+            const titleMap = {
+                '24h': { t: '24小时内新加词汇', c: 'text-green-600' },
+                '7d': { t: '过去 1 - 7 天添加词汇', c: 'text-blue-600' },
+                '30d': { t: '过去 7 - 30 天添加词汇', c: 'text-purple-600' }
+            };
+
+            const area = document.getElementById('library-content-area');
+
+            if (targetWords.length === 0) {
+                area.innerHTML = `<div class="text-center py-16 bg-white rounded-3xl border border-stone-200 shadow-sm"><div class="text-4xl mb-3">📭</div><h3 class="text-lg font-bold text-stone-600">该时间段内没有新单词</h3><p class="text-xs text-stone-400 mt-2">当单词存在时间增长，会自动移入下一个时间段</p></div>`;
+                return;
+            }
+
+            // 3. 构建平铺的网格视图（不套文件夹）
+            let flatHtml = `<div class="bg-white p-6 rounded-3xl shadow-sm border border-stone-200 animate-slide">
+                <h3 class="font-black ${titleMap[range].c} mb-6 flex items-center gap-2 border-b border-stone-100 pb-4">
+                    <span>🕒</span> ${titleMap[range].t}
+                    <span class="text-stone-400 font-normal text-sm ml-2">共计 ${targetWords.length} 词</span>
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">`;
+
+            // 渲染复用相同的卡片结构，并加上了具体是“几天前”的标签
+            targetWords.forEach(w => {
+                 const themeStyle = window.getCardTheme(w.tier);
+                 const pos = w.pos ? `<span class="text-[10px] bg-green-800/50 text-green-200 px-1 rounded ml-1 font-mono">${w.pos}</span>` : "";
+                 const daysOld = Math.floor((now - w.id) / (1000 * 60 * 60 * 24));
+                 const timeBadge = daysOld === 0 ? '今日加入' : `${daysOld}天前`;
+
+                 flatHtml += `<div class="test-card-container h-52 relative group cursor-grab active:cursor-grabbing"
+                                draggable="true"
+                                ondragstart="window.handleDragStart(event, ${w.id})"
+                                ondragend="window.handleDragEnd(event)"
+                                data-word="${w.word.toLowerCase()}" data-cn="${w.cn}">
+                                <div class="test-card-inner w-full h-full relative cursor-pointer" onclick="this.classList.toggle('flipped')">
+                                    <div class="backface-hidden absolute inset-0 ${themeStyle} border-2 rounded-2xl p-4 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-all">
+                                        <span class="absolute top-2 left-2 text-[9px] font-black text-stone-600 bg-white/80 border border-stone-200 px-1.5 py-0.5 rounded shadow-sm z-20">🕒 ${timeBadge}</span>
+                                        <button onclick="window.editWord(${w.id}, event)" class="absolute top-2 right-8 text-stone-400 hover:text-purple-600 z-20 text-xs transition-colors" title="编辑">✏️</button>
+                                        <button onclick="window.deleteWord(${w.id}, event)" class="absolute top-2 right-2 text-stone-300 hover:text-red-500 z-20 text-xs transition-colors" title="删除">✕</button>
+                                        <div class="text-3xl mt-4">${w.icon || '📌'}</div>
+                                        <div class="text-center">
+                                            <h4 class="text-base font-black text-stone-800 leading-tight break-words px-1">${w.word}</h4>
+                                            <div class="mt-1">${window.getTierBadge(w.tier, false)}</div>
+                                        </div>
+                                        <div class="flex gap-1 w-full" onclick="event.stopPropagation()">
+                                            <button onclick="window.speak('${w.word}', 'en-GB')" class="flex-1 text-[9px] font-bold py-1.5 bg-white/50 border border-white/80 rounded-lg hover:bg-white transition-colors">🇬🇧 UK</button>
+                                            <button onclick="window.speak('${w.word}', 'en-US')" class="flex-1 text-[9px] font-bold py-1.5 bg-white/50 border border-white/80 rounded-lg hover:bg-white transition-colors">🇺🇸 US</button>
+                                        </div>
+                                    </div>
+                                    <div class="backface-hidden rotate-y-180 absolute inset-0 bg-stone-800 text-white rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+                                        <p class="text-base font-bold text-green-400 mb-1 flex items-center justify-center flex-wrap">${w.cn} ${pos}</p>
+                                        <p class="text-[9px] text-stone-400 font-mono mb-2 leading-tight break-words">🇬🇧 ${w.uk || '--'}<br>🇺🇸 ${w.us || '--'}</p>
+                                        <p class="text-[10px] text-stone-300 leading-tight line-clamp-3 border-t border-stone-600 pt-2 w-full">${w.col}</p>
+                                    </div>
+                                </div>
+                            </div>`;
+            });
+            flatHtml += `</div></div>`;
+
+            // 仅替换下方显示区域，不动头部导航栏
+            area.innerHTML = flatHtml;
+        }
+        // ================= 文件夹单击重命名 =================
+        window.renameFolder = async function(oldName, isTheme, event) {
+            event.stopPropagation(); // 阻止触发折叠/展开操作
+            const newName = prompt(`请输入新的${isTheme ? '【主文件夹】' : '【子文件夹】'}名称：`, oldName);
+
+            if (!newName || newName.trim() === '' || newName === oldName) return;
+
+            // 遍历词库，更新所有对应单词的分类名称
+            window.vocabData.forEach(w => {
+                if (isTheme && w.theme === oldName) w.theme = newName.trim();
+                if (!isTheme && w.cat === oldName) w.cat = newName.trim();
+            });
+
+            window.showToast("⏳ 正在更新文件夹结构...");
+            await window.saveData(); // 保存到云端
+            window.renderLibrary();  // 重新渲染视图
+            window.showToast("✅ 文件夹重命名成功！");
+        }
+      // 完整版：词库列表二级嵌套渲染（包含卡片右上角的编辑按钮和背面的音标）
+        window.renderLibrary = function() {
+            const container = document.getElementById('library-view');
+
+            const coreCategories = {
+                "教育与学术": ["校园生活", "学术研究", "教育理念"],
+                "自然与环境": ["气候与灾害", "生态与动植物", "环保与能源"],
+                "科学与技术": ["前沿科技", "网络与媒体", "科技影响"],
+                "社会与文化": ["人口与老龄化", "文化与传统", "城市化问题"],
+                "工作与经济": ["职场与就业", "商业与管理", "宏观经济"],
+                "医疗与健康": ["疾病与症状", "医疗与治疗", "生活方式"],
+                "日常生活与休闲": ["旅游与交通", "爱好与娱乐", "房屋与住宿"],
+                "政府与法律": ["法律与犯罪", "政府职能", "社会福利与审查"]
+            };
+
+            // 找到这段原有代码并替换成下面的样子
+            let html = `
+            <div class="flex flex-col md:flex-row gap-4 mb-4">
+                <div class="flex-1 p-6 bg-blue-50 rounded-3xl border border-blue-200 shadow-inner">
+                    <h3 class="font-black text-blue-900 mb-3 text-sm flex items-center">🔍 智能搜索</h3>
+                    <input type="text" id="library-search-input" placeholder="搜索..." class="w-full px-4 py-3 rounded-xl border-2 border-blue-100 outline-none" oninput="window.filterLibrary(this.value)">
+                </div>
+                <div class="flex-1 p-6 bg-purple-50 rounded-3xl border border-purple-200 shadow-inner">
+                    <h3 class="font-black text-purple-900 mb-3 text-sm flex items-center">➕ 添加新词</h3>
+                    <div class="flex gap-2">
+                        <input id="new-word-input" type="text" placeholder="输入单词..." class="flex-1 px-4 py-3 rounded-xl border-2 border-purple-100 outline-none">
+                        <button id="ai-parse-btn" onclick="window.autoFillAndAddWord()" class="bg-purple-600 text-white px-5 rounded-xl font-bold">🤖 AI 解析</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mb-8 items-center p-4 bg-stone-50 rounded-2xl border border-stone-200 shadow-sm">
+                <span class="text-sm font-black text-stone-600 mr-2 flex items-center">🕒 按加入时间筛选:</span>
+                <button onclick="window.filterByTime('24h')" class="px-4 py-2 bg-white hover:bg-green-50 hover:text-green-600 border border-stone-200 rounded-xl text-xs font-bold text-stone-600 transition-colors shadow-sm active:scale-95">24小时内</button>
+                <button onclick="window.filterByTime('7d')" class="px-4 py-2 bg-white hover:bg-blue-50 hover:text-blue-600 border border-stone-200 rounded-xl text-xs font-bold text-stone-600 transition-colors shadow-sm active:scale-95">1-7天内</button>
+                <button onclick="window.filterByTime('30d')" class="px-4 py-2 bg-white hover:bg-purple-50 hover:text-purple-600 border border-stone-200 rounded-xl text-xs font-bold text-stone-600 transition-colors shadow-sm active:scale-95">7-30天内</button>
+                <button onclick="window.renderLibrary()" class="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-xs font-bold ml-auto shadow-md transition-all active:scale-95">📁 恢复默认分类</button>
+            </div>
+
+            <div id="library-content-area">`;
+
+            // 原来的 groupedData 分组逻辑和遍历保持不变
+            // ...
+
+            // 在 renderLibrary 函数的最末尾闭合标签：
+            html += `</div>`; // 闭合 library-content-area
+            container.innerHTML = html;
+
+            const groupedData = {};
+            window.vocabData.forEach(w => {
+                const theme = Object.keys(coreCategories).includes(w.theme) ? w.theme : "📁 其他未分类/旧词汇";
+                const cat = w.cat || "默认分类";
+                if (!groupedData[theme]) groupedData[theme] = {};
+                if (!groupedData[theme][cat]) groupedData[theme][cat] = [];
+                groupedData[theme][cat].push(w);
+            });
+
+            const themesToRender = [...Object.keys(coreCategories), "📁 其他未分类/旧词汇"];
+
+            themesToRender.forEach((theme, i) => {
+                if (!groupedData[theme]) return;
+                let themeTotalWords = Object.values(groupedData[theme]).flat().length;
+
+                html += `<div class="mb-6 bg-white rounded-3xl shadow-sm border border-stone-200 overflow-hidden theme-section">
+                    <button onclick="window.toggleSection('t-${i}')" class="w-full px-6 py-5 flex justify-between items-center font-black text-stone-700 bg-stone-50 hover:bg-stone-100 transition-colors tracking-wider">
+                        <span class="text-lg flex items-center gap-2">
+    📚 <span ondblclick="window.renameFolder('${theme}', true, event)" class="hover:underline hover:text-purple-600 cursor-text px-1 rounded transition-colors" title="双击重命名">${theme}</span>
+    <span class="text-stone-400 font-normal text-sm">(${themeTotalWords}词)</span>
+</span>
+                    </button>
+                    <div id="t-${i}" class="hidden p-6 bg-stone-50/50 flex flex-col gap-8 theme-content">`;
+
+                const cats = groupedData[theme];
+                Object.keys(cats).forEach((cat, j) => {
+                    let tWords = cats[cat];
+                    if (tWords.length === 0) return;
+
+                    const tierRank = { 'SSS': 7, 'SS': 6, 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+                    tWords.sort((a, b) => {
+                        const rankA = tierRank[(a.tier || 'B').toUpperCase()] || 0;
+                        const rankB = tierRank[(b.tier || 'B').toUpperCase()] || 0;
+                        if (rankB !== rankA) return rankB - rankA;
+                        const lvlA = (window.memoryState[a.id] || {}).lvl || 0;
+                        const lvlB = (window.memoryState[b.id] || {}).lvl || 0;
+                        return lvlA - lvlB;
+                    });
+
+                    html += `
+                        <div class="border-l-4 border-purple-400 pl-4 p-2 rounded-xl transition-all border-2 border-transparent"
+     ondragover="window.handleDragOver(event)"
+     ondragleave="window.handleDragLeave(event)"
+     ondrop="window.handleDrop(event, '${theme}', '${cat}')">
+                            <h4 class="font-bold text-stone-600 mb-4 text-sm flex items-center">
+                               <span ondblclick="window.renameFolder('${cat}', false, event)" class="bg-purple-100 text-purple-700 hover:bg-purple-200 cursor-text px-3 py-1 rounded-md text-xs mr-2 border border-purple-200 shadow-sm transition-colors" title="双击重命名">📂 ${cat}</span>
+                                <span class="text-stone-400 text-xs">(${tWords.length}词)</span>
+                            </h4>
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    `;
+
+                    tWords.forEach(w => {
+                        const lvl = (window.memoryState[w.id] || {}).lvl || 0;
+                        const themeStyle = window.getCardTheme(w.tier);
+                        const pos = w.pos ? `<span class="text-[10px] bg-green-800/50 text-green-200 px-1 rounded ml-1 font-mono">${w.pos}</span>` : "";
+
+                        html += `<div class="test-card-container h-52 relative group cursor-grab active:cursor-grabbing"
+             draggable="true"
+             ondragstart="window.handleDragStart(event, ${w.id})"
+             ondragend="window.handleDragEnd(event)"
+             data-word="${w.word.toLowerCase()}" data-cn="${w.cn}">
+                            <div class="test-card-inner w-full h-full relative cursor-pointer" onclick="this.classList.toggle('flipped')">
+                                <div class="backface-hidden absolute inset-0 ${themeStyle} border-2 rounded-2xl p-4 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-all">
+                                    <span class="absolute top-2 left-2 text-[9px] font-black text-green-700 bg-white/80 border border-green-200 px-1.5 py-0.5 rounded shadow-sm z-20">L${lvl}</span>
+
+                                    <button onclick="window.editWord(${w.id}, event)" class="absolute top-2 right-8 text-stone-400 hover:text-purple-600 z-20 text-xs transition-colors" title="编辑">✏️</button>
+                                    <button onclick="window.deleteWord(${w.id}, event)" class="absolute top-2 right-2 text-stone-300 hover:text-red-500 z-20 text-xs transition-colors" title="删除">✕</button>
+
+                                    <div class="text-3xl mt-4">${w.icon || '📌'}</div>
+                                    <div class="text-center">
+                                        <h4 class="text-base font-black text-stone-800 leading-tight break-words px-1">${w.word}</h4>
+                                        <div class="mt-1">${window.getTierBadge(w.tier, false)}</div>
+                                    </div>
+
+                                    <div class="flex gap-1 w-full" onclick="event.stopPropagation()">
+                                        <button onclick="window.speak('${w.word}', 'en-GB')" class="flex-1 text-[9px] font-bold py-1.5 bg-white/50 border border-white/80 rounded-lg hover:bg-white transition-colors">🇬🇧 UK</button>
+                                        <button onclick="window.speak('${w.word}', 'en-US')" class="flex-1 text-[9px] font-bold py-1.5 bg-white/50 border border-white/80 rounded-lg hover:bg-white transition-colors">🇺🇸 US</button>
+                                    </div>
+                                </div>
+
+                                <div class="backface-hidden rotate-y-180 absolute inset-0 bg-stone-800 text-white rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+                                    <p class="text-base font-bold text-green-400 mb-1 flex items-center justify-center flex-wrap">${w.cn} ${pos}</p>
+                                    <p class="text-[9px] text-stone-400 font-mono mb-2 leading-tight break-words">🇬🇧 ${w.uk || '--'}<br>🇺🇸 ${w.us || '--'}</p>
+
+                                    <p class="text-[10px] text-stone-300 leading-tight line-clamp-3 border-t border-stone-600 pt-2 w-full">${w.col}</p>
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                html += `</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        window.switchView = function(view) {
+            document.getElementById('training-view').classList.toggle('hidden', view !== 'training');
+            document.getElementById('library-view').classList.toggle('hidden', view !== 'library');
+            document.getElementById('tab-t').className = view === 'training' ? "px-6 py-2 bg-green-800 text-white rounded-full font-bold shadow-lg" : "px-6 py-2 text-stone-400 font-bold";
+            document.getElementById('tab-l').className = view === 'library' ? "px-6 py-2 bg-green-800 text-white rounded-full font-bold shadow-lg" : "px-6 py-2 text-stone-400 font-bold";
+            if(view === 'library') window.renderLibrary();
+        }
+
+        window.speak = function(text, lang) {
+            try {
+                if (!('speechSynthesis' in window)) return;
+                window.speechSynthesis.resume(); window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = lang; u.rate = 0.85;
+                window.currentUtterance = u; window.speechSynthesis.speak(u);
+            } catch (e) { console.error("发音失败", e); }
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</head>
+<body class="bg-stone-100 text-stone-800 font-sans min-h-screen selection:bg-green-100">
+
+    <div id="auth-overlay" class="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-stone-900/60 backdrop-blur-sm">
+        <div class="glass-effect p-10 rounded-[3rem] w-full max-w-sm shadow-2xl animate-slide text-center">
+            <div class="mb-8">
+                <span class="text-5xl">🐘</span>
+                <h2 id="auth-title" class="text-3xl font-black text-stone-800 mt-4 mb-2">欢迎回来</h2>
+                <p class="text-stone-400 text-sm">账号登录，进度全设备自动同步</p>
+            </div>
+            <div class="space-y-4 text-left">
+                <input id="email" type="email" placeholder="邮箱" class="w-full px-6 py-4 bg-stone-100 rounded-2xl outline-none focus:ring-2 ring-green-500 transition-all font-bold">
+                <input id="password" type="password" placeholder="密码" class="w-full px-6 py-4 bg-stone-100 rounded-2xl outline-none focus:ring-2 ring-green-500 transition-all font-bold">
+                <button id="auth-main-btn" onclick="window.handleAuth()" class="w-full py-4 bg-green-700 text-white font-black rounded-2xl shadow-xl hover:bg-green-800 transition-all active:scale-95">登录</button>
+            </div>
+            <p class="mt-8 text-sm">
+                <span id="auth-switch-text" onclick="window.toggleAuthMode()" class="text-green-700 font-bold cursor-pointer hover:underline">没有账号？点击注册</span>
+            </p>
+        </div>
+    </div>
+
+    <header class="bg-green-900 text-white py-8 px-6 shadow-lg border-b-6 border-green-700 relative text-center">
+        <button onclick="window.downloadUpdatedHTML()" class="absolute top-3 left-6 bg-amber-500/20 border border-amber-400/50 hover:bg-amber-500 text-amber-200 hover:text-white text-[10px] font-bold px-3 py-1.5 rounded-full">
+            ⬇️ 导出备份
+        </button>
+        <div id="cloud-status" class="absolute top-4 right-6 text-[10px] font-mono bg-black/20 px-3 py-1 rounded-full text-green-200 italic">正在启动...</div>
+        <button onclick="window.handleLogout()" class="absolute top-12 left-6 text-[10px] bg-white/10 px-3 py-1 rounded-full hover:bg-white/20">注销退出</button>
+        <h1 class="text-2xl md:text-3xl font-black mb-1 mt-4 md:mt-0 tracking-tight">🐘 雅思词汇每日抗遗忘特训</h1>
+        <p class="text-green-200 text-xs opacity-80 font-bold uppercase tracking-widest">《杨佳奇 | 龚欣翔 | 张耀文》创始独享版</p>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 md:p-8">
+        <nav class="flex justify-center gap-2 mb-8 bg-white p-2 rounded-full shadow-sm w-fit mx-auto border border-stone-200">
+            <button id="tab-t" onclick="window.switchView('training')" class="px-6 py-2 bg-green-800 text-white rounded-full font-bold shadow-lg transition-all">🎯 每日特训</button>
+            <button id="tab-l" onclick="window.switchView('library')" class="px-6 py-2 text-stone-400 font-bold transition-all hover:text-green-700">📚 词汇总库</button>
+        </nav>
+
+        <div id="training-view" class="space-y-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-white p-4 rounded-2xl border border-stone-200 text-center"><p class="text-[10px] font-bold text-stone-400 uppercase">今日复习</p><p id="stat-due" class="text-2xl font-black text-red-500">0</p></div>
+                <div class="bg-white p-4 rounded-2xl border border-stone-200 text-center"><p class="text-[10px] font-bold text-stone-400 uppercase">L1 级</p><p id="stat-l1" class="text-2xl font-black text-amber-500">0</p></div>
+                <div class="bg-white p-4 rounded-2xl border border-stone-200 text-center"><p class="text-[10px] font-bold text-stone-400 uppercase">L2 级</p><p id="stat-l2" class="text-2xl font-black text-blue-500">0</p></div>
+                <div class="bg-white p-4 rounded-2xl border border-stone-200 text-center"><p class="text-[10px] font-bold text-stone-400 uppercase">L3 级</p><p id="stat-l3" class="text-2xl font-black text-green-500">0</p></div>
+            </div>
+            <div id="test-zone" class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-stone-200 min-h-[400px] flex flex-col justify-center animate-slide"></div>
+
+            <section class="bg-purple-900 text-white p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden mt-12">
+                <div class="absolute top-0 right-0 -mr-12 -mt-12 text-[10rem] opacity-5 select-none font-black italic">IELTS</div>
+                <div class="relative z-10 text-center">
+                    <h3 class="text-2xl font-black text-purple-200 mb-6">🤖 AI 雅思全功能助教</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
+                        <button onclick="window.triggerAI('essay')" class="bg-white/10 hover:bg-white/20 px-4 py-4 rounded-2xl font-bold border border-white/20 transition-all text-sm flex flex-col items-center">✍️ Writing 段落</button>
+                        <button onclick="window.triggerAI('speaking')" class="bg-white/10 hover:bg-white/20 px-4 py-4 rounded-2xl font-bold border border-white/20 transition-all text-sm flex flex-col items-center">🗣️ Speaking 考官</button>
+                        <button onclick="window.triggerAI('quiz')" class="bg-white/10 hover:bg-white/20 px-4 py-4 rounded-2xl font-bold border border-white/20 transition-all text-sm flex flex-col items-center">🎯 挖空测验</button>
+                    </div>
+                    <div id="ai-panel" class="hidden bg-stone-50 text-stone-800 p-8 rounded-3xl text-left shadow-inner min-h-[150px] relative">
+                        <div id="ai-loader" class="hidden absolute inset-0 bg-white/90 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center z-10">
+                            <div class="animate-spin text-3xl mb-2">🌀</div>
+                            <span class="font-bold text-purple-800 text-sm">GEMINI 正在创作...</span>
+                        </div>
+                        <div id="ai-content" class="font-serif leading-relaxed text-base"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div id="library-view" class="hidden space-y-4 animate-slide"></div>
+    </main>
+
+    <footer class="text-center py-10 text-stone-400 text-[10px] uppercase tracking-widest">
+        <p>IELTS VOCAB v10.0 | 账号云端版 | 所有版权归原作者</p>
+    </footer>
+
+</body>
+</html>
